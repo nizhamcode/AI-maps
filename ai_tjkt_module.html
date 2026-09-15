@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Modul Interaktif: Peta AI untuk TJKT</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.4s ease-out forwards',
+                        'slide-up': 'slideUp 0.4s ease-out forwards',
+                        'bounce-slight': 'bounceSlight 2s infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        bounceSlight: {
+                            '0%, 100%': { transform: 'translateY(-5%)' },
+                            '50%': { transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+        
+        /* Prevent all scrolling to strictly meet "tanpa scroll" requirement */
+        body {
+            overflow: hidden;
+            touch-action: none; /* Prevent swipe-to-refresh on mobile */
+        }
+
+        /* Glassmorphism utilities */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .dark .glass {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Custom scrollbar for absolute emergencies (though disabled by body) */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+        /* Slide Transition Classes */
+        .slide-content {
+            display: none;
+            height: 100%;
+        }
+        .slide-content.active {
+            display: flex;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors duration-300 h-screen w-screen flex flex-col font-sans select-none">
+
+    <!-- Header / Navbar -->
+    <header class="glass fixed top-0 w-full z-50 flex justify-between items-center px-4 md:px-8 py-3 shadow-sm transition-colors duration-300">
+        <div class="flex items-center gap-2">
+            <span class="text-2xl animate-bounce-slight">🤖</span>
+            <h1 class="font-bold text-sm md:text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
+                PETA AI TJKT
+            </h1>
+        </div>
+        <div class="flex items-center gap-3 md:gap-4">
+            <!-- Progress Indicator -->
+            <div class="text-xs md:text-sm font-semibold px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-full">
+                <span id="slide-counter">1/10</span>
+            </div>
+            <!-- Sound Toggle -->
+            <button id="sound-toggle" class="text-xl p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition" title="Toggle Sound">
+                🔊
+            </button>
+            <!-- Dark Mode Toggle -->
+            <button id="theme-toggle" class="text-xl p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition" title="Toggle Dark Mode">
+                🌙
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 mt-16 mb-16 relative w-full max-w-5xl mx-auto px-4 sm:px-6">
+        <!-- Progress Bar (Visual) -->
+        <div class="absolute top-0 left-0 w-full h-1 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div id="progress-bar" class="h-full bg-blue-500 transition-all duration-300 w-0"></div>
+        </div>
+
+        <div id="slides-container" class="w-full h-full relative">
+            <!-- Slides will be injected here via JS -->
+        </div>
+    </main>
+
+    <!-- Footer / Navigation Controls -->
+    <footer class="glass fixed bottom-0 w-full z-50 flex justify-between items-center px-4 md:px-8 py-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        <button id="btn-prev" class="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 rounded-lg font-semibold transition disabled:opacity-30 disabled:cursor-not-allowed">
+            <span>◀</span> <span class="hidden sm:inline">Sebelumnya</span>
+        </button>
+        <div class="flex gap-1" id="dot-indicators">
+            <!-- Dots generated by JS -->
+        </div>
+        <button id="btn-next" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30">
+            <span class="hidden sm:inline">Selanjutnya</span> <span>▶</span>
+        </button>
+    </footer>
+
+    <!-- Script for Logic -->
+    <script>
+        // --- 1. SOUND SYSTEM (Web Audio API) ---
+        let audioCtx;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            initAudio();
+            
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+            
+            if (type === 'click') {
+                // Short subtle blip
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'correct') {
+                // Happy double chime
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'wrong') {
+                // Low buzz
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'finish') {
+                // Success chord
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, now);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
+
+        // --- 2. THEME TOGGLE ---
+        const themeToggle = document.getElementById('theme-toggle');
+        const htmlElement = document.documentElement;
+        
+        themeToggle.addEventListener('click', () => {
+            playSound('click');
+            htmlElement.classList.toggle('dark');
+            themeToggle.textContent = htmlElement.classList.contains('dark') ? '🌙' : '☀️';
+        });
+
+        // --- 3. SOUND TOGGLE ---
+        const soundToggleBtn = document.getElementById('sound-toggle');
+        soundToggleBtn.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            soundToggleBtn.textContent = soundEnabled ? '🔊' : '🔇';
+            if (soundEnabled) playSound('click');
+        });
+
+        // --- 4. CONTENT DATA (Slides & Narration) ---
+        const moduleData = [
+            {
+                type: 'cover',
+                title: 'Peta Teknologi AI',
+                subtitle: 'Perspektif Engineer TJKT',
+                icon: '🚀',
+                content: 'AI bukan sekadar "chatbot" atau software ajaib. Di balik layar, AI adalah monster komputasi yang haus akan <b>Data, Jaringan, dan Infrastruktur Fisik</b>.<br><br>Modul ini akan membongkar rahasia dapur AI khusus untuk pelajar Teknik Jaringan Komputer dan Telekomunikasi (TJKT).'
+            },
+            {
+                type: 'slide',
+                title: '1. Big Picture: Perjalanan Sebuah Prompt',
+                icon: '🧭',
+                content: `
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs sm:text-sm">
+                        <div class="bg-blue-100 dark:bg-blue-900 p-2 rounded-lg shadow"><span class="text-xl">📱</span><br><b>User Device</b><br>Kirim prompt</div>
+                        <div class="bg-indigo-100 dark:bg-indigo-900 p-2 rounded-lg shadow"><span class="text-xl">🌐</span><br><b>Network/ISP</b><br>Routing data</div>
+                        <div class="bg-purple-100 dark:bg-purple-900 p-2 rounded-lg shadow"><span class="text-xl">🏢</span><br><b>Data Center</b><br>Server & Storage</div>
+                        <div class="bg-pink-100 dark:bg-pink-900 p-2 rounded-lg shadow"><span class="text-xl">🧮</span><br><b>AI Model</b><br>Inference & Output</div>
+                    </div>
+                    <p class="mt-4 text-sm md:text-base leading-relaxed">
+                        <b>Fakta:</b> Ketika seseorang mengetik pertanyaan ke AI, terjadi perjalanan data ekstrem melalui HTTPS, DNS, Router, Firewall, Load Balancer, hingga tiba di GPU Cluster. AI adalah <b>sistem terintegrasi</b>, bukan ruang hampa.
+                    </p>
+                `
+            },
+            {
+                type: 'slide',
+                title: '2. Hardware: Mengapa GPU Merajai AI?',
+                icon: '💻',
+                content: `
+                    <div class="flex flex-col md:flex-row gap-4 h-full">
+                        <div class="flex-1 border-2 border-green-500 rounded-xl p-3 bg-green-50 dark:bg-green-900/30">
+                            <h3 class="font-bold text-green-700 dark:text-green-400 text-center flex items-center justify-center gap-2">🧠 CPU <span class="text-xs font-normal">(Central Processing Unit)</span></h3>
+                            <div class="mt-2 text-center text-2xl">🏎️</div>
+                            <p class="text-xs sm:text-sm mt-2 text-center">Seperti mobil balap F1. Sangat cepat menyelesaikan <b>satu tugas spesifik (logic/OS)</b> secara berurutan (Sequential).</p>
+                        </div>
+                        <div class="flex-1 border-2 border-purple-500 rounded-xl p-3 bg-purple-50 dark:bg-purple-900/30">
+                            <h3 class="font-bold text-purple-700 dark:text-purple-400 text-center flex items-center justify-center gap-2">🧮 GPU <span class="text-xs font-normal">(Graphics Processing Unit)</span></h3>
+                            <div class="mt-2 text-center text-2xl">🚌🚌🚌</div>
+                            <p class="text-xs sm:text-sm mt-2 text-center">Seperti armada bus. Tidak secepat F1, tapi bisa membawa <b>ribuan penumpang (data/operasi paralel)</b> sekaligus. Sempurna untuk Neural Network AI.</p>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                type: 'slide',
+                title: '3. Rahasia Compute & Data Movement',
+                icon: '🚚',
+                content: `
+                    <p class="text-sm md:text-base mb-3 border-l-4 border-blue-500 pl-3">
+                        <b>Compute =</b> Operasi matematika (Matrix, Neural Network).<br>
+                        <b>Data Movement =</b> Memindahkan data dari Storage ➡️ RAM ➡️ GPU Memory.
+                    </p>
+                    <div class="bg-gray-200 dark:bg-gray-800 p-4 rounded-xl shadow-inner text-center">
+                        <div class="text-4xl mb-2">⚠️</div>
+                        <p class="font-bold text-red-600 dark:text-red-400">Fakta Kritis di Dunia AI:</p>
+                        <p class="text-sm md:text-base mt-2">
+                            Operasi compute (perhitungan) itu <b>murah</b>, tetapi memindahkan data antar komponen itu <b>sangat mahal</b>. Rasio cost-nya bisa mencapai <b>200x lipat!</b><br>Oleh karena itu, komunikasi antar-GPU dan kecepatan jaringan (Networking) menjadi nyawa sistem AI.
+                        </p>
+                    </div>
+                `
+            },
+            {
+                type: 'slide',
+                title: '4. Ancaman Terbesar AI: Bottleneck',
+                icon: '🚧',
+                content: `
+                    <p class="text-sm md:text-base mb-2 text-center">Performance sistem tidak ditentukan oleh komponen tercepat, tapi oleh <b>titik terlemahnya (bottleneck)</b>.</p>
+                    <div class="flex items-center justify-center gap-2 mt-4 text-xs md:text-sm font-mono bg-white dark:bg-black p-3 rounded-xl border border-gray-300 dark:border-gray-700">
+                        <div class="text-center p-2"><span class="text-2xl">🖥️</span><br>Server<br><span class="text-green-500 font-bold">1 Gbps</span></div>
+                        <div class="text-gray-400">➡️</div>
+                        <div class="text-center p-2"><span class="text-2xl">🎛️</span><br>Switch<br><span class="text-green-500 font-bold">1 Gbps</span></div>
+                        <div class="text-gray-400">➡️</div>
+                        <div class="text-center p-2 border-2 border-red-500 rounded-lg animate-pulse"><span class="text-2xl">🖲️</span><br>Router<br><span class="text-red-500 font-bold">100 Mbps</span></div>
+                        <div class="text-gray-400">➡️</div>
+                        <div class="text-center p-2"><span class="text-2xl">🌍</span><br>Internet</div>
+                    </div>
+                    <p class="text-xs sm:text-sm mt-4 text-center text-gray-600 dark:text-gray-400">
+                        Analogi: Gedung mampu menampung 1.000 orang, tapi jalan masuk hanya muat untuk 100 orang. Data AI akan <b>macet di Router</b>.
+                    </p>
+                `
+            },
+            {
+                type: 'slide',
+                title: '5. Bandwidth vs Latency',
+                icon: '📡',
+                content: `
+                    <div class="space-y-4 h-full flex flex-col justify-center">
+                        <div class="bg-blue-50 dark:bg-blue-900/40 p-4 rounded-xl shadow-md border-l-4 border-blue-500 flex items-center gap-4">
+                            <div class="text-4xl">🛣️</div>
+                            <div>
+                                <h3 class="font-bold text-blue-700 dark:text-blue-300">Bandwidth (Kapasitas Jalan)</h3>
+                                <p class="text-xs sm:text-sm">Seberapa banyak data bisa ditransfer per detik (misal: 100 Mbps). Ibarat jalan tol 4 lajur penuh truk 🚚🚚🚚🚚.</p>
+                            </div>
+                        </div>
+                        <div class="bg-yellow-50 dark:bg-yellow-900/40 p-4 rounded-xl shadow-md border-l-4 border-yellow-500 flex items-center gap-4">
+                            <div class="text-4xl">⏱️</div>
+                            <div>
+                                <h3 class="font-bold text-yellow-700 dark:text-yellow-300">Latency (Waktu Tempuh)</h3>
+                                <p class="text-xs sm:text-sm">Waktu perjalanan data dari ujung ke ujung (misal: 10 ms). Ibarat kecepatan mobil sport 🏎️ melaju dari A ke B.</p>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                type: 'slide',
+                title: '6. Fisika AI: Listrik & Pendingin',
+                icon: '⚡',
+                content: `
+                    <p class="text-sm md:text-base text-center mb-4">Sistem AI memeras keringat hardware. GPU bekerja ekstrem menghasilkan <b>Panas Tinggi (Heat) 🔥</b>.</p>
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div class="glass p-3 rounded-xl">
+                            <div class="text-3xl mb-1">🔌</div>
+                            <h4 class="font-bold text-sm">Power (Daya)</h4>
+                            <p class="text-xs mt-1">Laporan IEA menyebutkan konsumsi listrik Data Center AI melonjak tajam secara global.</p>
+                        </div>
+                        <div class="glass p-3 rounded-xl">
+                            <div class="text-3xl mb-1">❄️</div>
+                            <h4 class="font-bold text-sm">Cooling</h4>
+                            <p class="text-xs mt-1">Tanpa cooling (pendingin) udara/cair, Suhu Naik ➡️ Performa Turun ➡️ Hardware Rusak.</p>
+                        </div>
+                    </div>
+                    <p class="text-xs sm:text-sm font-semibold text-center mt-4 p-2 bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 rounded">
+                        Engineer jaringan masa depan juga harus memikirkan efisiensi Energi!
+                    </p>
+                `
+            },
+            {
+                type: 'slide',
+                title: '7. Edge AI vs Cloud AI',
+                icon: '📍',
+                content: `
+                    <p class="text-sm md:text-base text-center mb-3">Tidak semua data harus dikirim ke "awan".</p>
+                    <div class="flex flex-col gap-3">
+                        <div class="border border-blue-300 dark:border-blue-700 rounded-lg p-3 relative bg-white/50 dark:bg-black/50">
+                            <div class="absolute -top-3 -left-3 bg-blue-500 text-white text-xs px-2 py-1 rounded-full shadow">☁️ Cloud AI</div>
+                            <p class="text-xs mt-1">Data dikirim ke server pusat. Resource besar, butuh internet stabil. Cocok untuk training model raksasa (LLM).</p>
+                        </div>
+                        <div class="text-center font-bold text-xl text-gray-400">VS</div>
+                        <div class="border border-green-300 dark:border-green-700 rounded-lg p-3 relative bg-white/50 dark:bg-black/50">
+                            <div class="absolute -top-3 -right-3 bg-green-500 text-white text-xs px-2 py-1 rounded-full shadow">📍 Edge AI</div>
+                            <p class="text-xs mt-1">Data diproses lokal di perangkat (misal: Kamera CCTV AI). Cepat (latency rendah), hemat bandwidth, menjaga privasi data sensitif <b>(Sovereign AI)</b>.</p>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                type: 'slide',
+                title: '8. Posisi TJKT di Dunia AI',
+                icon: '🎯',
+                content: `
+                    <h3 class="font-bold text-center text-indigo-600 dark:text-indigo-400 mb-2">TJKT Tidak Harus Jadi Pembuat Model AI!</h3>
+                    <p class="text-xs sm:text-sm text-center mb-4">AI raksasa butuh infrastruktur andal. Di sinilah ahli TJKT berkuasa:</p>
+                    <ul class="text-xs sm:text-sm space-y-2 max-w-md mx-auto list-disc pl-5">
+                        <li><b>Network Engineer:</b> Mengatur konektivitas antar GPU & User.</li>
+                        <li><b>Cloud Admin:</b> Mengelola Load Balancer, API, dan server cloud.</li>
+                        <li><b>Cybersecurity:</b> Mengamankan API dan mencegah kebocoran data dengan framework <i>(NIST: Govern, Map, Measure, Manage)</i>.</li>
+                        <li><b>Data Center Tech:</b> Memastikan power & cooling berjalan optimal 24/7.</li>
+                    </ul>
+                `
+            },
+            {
+                type: 'slide',
+                title: '9. Pola Pikir Engineer AI',
+                icon: '🧠',
+                content: `
+                    <div class="h-full flex flex-col justify-center items-center text-center">
+                        <p class="mb-4 text-sm md:text-base">Berhentilah bertanya hanya: <i>"AI ini pakai model apa?"</i></p>
+                        <div class="bg-gray-800 text-green-400 font-mono text-left p-4 rounded-xl shadow-2xl w-full text-xs sm:text-sm">
+                            > SYSTEM CHECKLIST:<br>
+                            [?] DATA DARI MANA?<br>
+                            [?] DISIMPAN DI MANA? (SSD/Distributed Storage)<br>
+                            [?] COMPUTE DI MANA? (CPU/GPU)<br>
+                            [?] BOTTLENECK DI MANA?<br>
+                            [?] LATENCY & BANDWIDTH?<br>
+                            [?] BAGAIMANA JIKA SISTEM GAGAL? (Redundancy)
+                        </div>
+                        <p class="mt-4 font-bold animate-pulse text-indigo-600 dark:text-indigo-400">Ini adalah cara berpikir System Architect sejati!</p>
+                    </div>
+                `
+            },
+            {
+                type: 'intro-quiz',
+                title: 'Waktunya Uji Pemahaman! 🎮',
+                icon: '🕹️',
+                content: 'Kamu telah menyelesaikan materi inti.<br><br>Sekarang mari kita tes insting engineer kamu dalam sebuah mini kuis interaktif.<br><br>Siap?'
+            }
+        ];
+
+        const quizData = [
+            {
+                q: "Dalam arsitektur sistem komputasi AI, manakah operasi yang secara biaya infrastruktur (cost) jauh lebih mahal?",
+                options: [
+                    "Melakukan operasi matematika (Compute) di dalam GPU.",
+                    "Memindahkan data (Data Movement) antar storage, RAM, dan GPU.",
+                    "Melatih model neural network berukuran kecil (Small AI).",
+                    "Mematikan server saat tidak digunakan."
+                ],
+                correct: 1,
+                explanation: "Fakta kritis: Operasi compute sangat murah dibandingkan biaya pemindahan data (Data Movement), dengan rasio bisa mencapai 200x lebih mahal."
+            },
+            {
+                q: "Sebuah server AI memiliki port 1 Gbps, terhubung ke Switch 1 Gbps, namun router gateway ke internet hanya mendukung 100 Mbps. Apa istilah TJKT untuk titik lemah ini?",
+                options: [
+                    "Data Breach",
+                    "Latency Spike",
+                    "Bottleneck",
+                    "Overclocking"
+                ],
+                correct: 2,
+                explanation: "Bottleneck adalah titik kemacetan. Kecepatan maksimal sistem selalu dibatasi oleh komponen paling lambat dalam jaringannya."
+            },
+            {
+                q: "Kapasitas jalan tol ibarat banyaknya data yang bisa lewat per detik, sedangkan waktu tempuh mobil dari kota A ke kota B ibarat waktu perjalanan data. Dua istilah jaringan untuk analogi ini adalah...",
+                options: [
+                    "CPU dan GPU",
+                    "Bandwidth dan Latency",
+                    "Routing dan DNS",
+                    "Training dan Inference"
+                ],
+                correct: 1,
+                explanation: "Bandwidth adalah kapasitas data (seberapa banyak), sedangkan Latency adalah waktu tempuh (seberapa cepat data sampai)."
+            },
+            {
+                q: "Kamera pintar di perempatan jalan bisa mengenali plat nomor mobil secara langsung di dalam perangkat kameranya sendiri tanpa harus mengirim video utuh ke cloud. Konsep ini disebut:",
+                options: [
+                    "Edge AI",
+                    "Cloud AI",
+                    "Quantum Computing",
+                    "Data Center Centralization"
+                ],
+                correct: 0,
+                explanation: "Edge AI berarti pemrosesan (inference) dilakukan secara lokal di perangkat 'ujung' (edge), menghemat bandwidth dan latency."
+            },
+            {
+                q: "Mengapa GPU lebih sering digunakan daripada CPU dalam melatih (training) model Neural Network modern?",
+                options: [
+                    "Karena GPU memiliki sistem operasi sendiri.",
+                    "Karena GPU lebih hemat listrik daripada CPU.",
+                    "Karena GPU mampu melakukan ribuan operasi paralel secara bersamaan.",
+                    "Karena GPU terhubung langsung dengan router."
+                ],
+                correct: 2,
+                explanation: "GPU memiliki ribuan core (seperti armada bus) yang memungkinkannya melakukan operasi matematika paralel secara masif, sangat cocok untuk arsitektur Neural Network."
+            }
+        ];
+
+        // --- 5. RENDER LOGIC ---
+        const container = document.getElementById('slides-container');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        const dotIndicators = document.getElementById('dot-indicators');
+        const slideCounter = document.getElementById('slide-counter');
+        const progressBar = document.getElementById('progress-bar');
+
+        let currentSlideIdx = 0;
+        let isQuizMode = false;
+        let currentQuizIdx = 0;
+        let score = 0;
+        let quizCompleted = false;
+
+        const totalSlides = moduleData.length;
+        const totalQuiz = quizData.length;
+
+        function init() {
+            // Build Main Slides
+            moduleData.forEach((slide, index) => {
+                const div = document.createElement('div');
+                div.className = 'slide-content w-full h-full flex-col justify-center items-center p-4 md:p-8 animate-fade-in absolute inset-0 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden';
+                div.id = `slide-${index}`;
+                
+                if (slide.type === 'cover' || slide.type === 'intro-quiz') {
+                    div.innerHTML = `
+                        <div class="text-center h-full flex flex-col items-center justify-center space-y-6 max-w-2xl mx-auto">
+                            <div class="text-6xl md:text-8xl animate-bounce-slight">${slide.icon}</div>
+                            <h2 class="text-2xl md:text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">${slide.title}</h2>
+                            <p class="text-sm md:text-lg text-gray-700 dark:text-gray-300 leading-relaxed">${slide.content}</p>
+                            ${slide.type === 'intro-quiz' ? '<div class="text-sm text-gray-500 mt-4">(Klik Selanjutnya untuk mulai)</div>' : ''}
+                        </div>
+                    `;
+                } else {
+                    div.innerHTML = `
+                        <div class="w-full h-full flex flex-col">
+                            <h2 class="text-lg md:text-2xl font-bold mb-4 flex items-center gap-3 border-b-2 border-gray-200 dark:border-gray-700 pb-2 text-indigo-700 dark:text-indigo-400">
+                                <span>${slide.icon}</span> ${slide.title}
+                            </h2>
+                            <div class="flex-1 flex flex-col justify-center overflow-hidden">
+                                ${slide.content}
+                            </div>
+                        </div>
+                    `;
+                }
+                container.appendChild(div);
+            });
+
+            // Build Quiz Slides
+            quizData.forEach((quiz, index) => {
+                const div = document.createElement('div');
+                div.className = 'slide-content w-full h-full flex-col justify-center p-4 md:p-8 animate-fade-in absolute inset-0 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden';
+                div.id = `quiz-${index}`;
+                
+                let optionsHtml = quiz.options.map((opt, i) => `
+                    <button class="quiz-option w-full text-left p-3 md:p-4 mb-3 text-sm md:text-base rounded-xl border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all font-semibold text-gray-800 dark:text-gray-200" data-idx="${i}">
+                        <span class="inline-block w-6 h-6 text-center rounded-full bg-gray-200 dark:bg-gray-700 mr-2">${String.fromCharCode(65 + i)}</span> 
+                        ${opt}
+                    </button>
+                `).join('');
+
+                div.innerHTML = `
+                    <div class="w-full h-full flex flex-col max-w-3xl mx-auto">
+                        <div class="mb-4 flex justify-between items-center text-xs font-bold uppercase tracking-wider text-gray-500">
+                            <span>Pertanyaan ${index + 1}/${totalQuiz}</span>
+                            <span>Skor: <span id="score-display-${index}">0</span></span>
+                        </div>
+                        <h2 class="text-base md:text-xl font-bold mb-6 text-gray-900 dark:text-white leading-relaxed">
+                            ${quiz.q}
+                        </h2>
+                        <div class="options-container flex-1 overflow-y-auto pr-2 pb-10">
+                            ${optionsHtml}
+                        </div>
+                        <div class="explanation-box hidden mt-4 p-4 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-sm border-l-4 border-blue-500 animate-slide-up">
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            // Build Result Slide
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'slide-content w-full h-full flex-col justify-center items-center p-8 animate-fade-in absolute inset-0 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden';
+            resultDiv.id = `quiz-result`;
+            resultDiv.innerHTML = `
+                <div class="text-center w-full max-w-md mx-auto space-y-6">
+                    <div class="text-7xl animate-bounce-slight" id="result-icon">🏆</div>
+                    <h2 class="text-3xl font-extrabold text-gray-900 dark:text-white">Hasil Misi</h2>
+                    <div class="text-5xl font-black text-blue-600 dark:text-blue-400" id="final-score">0%</div>
+                    <p class="text-gray-700 dark:text-gray-300" id="result-message">Luar biasa!</p>
+                    <button onclick="location.reload()" class="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg transition w-full">Ulangi Modul 🔄</button>
+                </div>
+            `;
+            container.appendChild(resultDiv);
+
+            // Bind Quiz Logic
+            document.querySelectorAll('.quiz-option').forEach(btn => {
+                btn.addEventListener('click', handleQuizAnswer);
+            });
+
+            updateUI();
+        }
+
+        function handleQuizAnswer(e) {
+            if (e.currentTarget.disabled) return; // Prevent multiple clicks
+            
+            const btn = e.currentTarget;
+            const container = btn.closest('.slide-content');
+            const explanationBox = container.querySelector('.explanation-box');
+            const allBtns = container.querySelectorAll('.quiz-option');
+            const selectedIdx = parseInt(btn.dataset.idx);
+            
+            const qData = quizData[currentQuizIdx];
+            const isCorrect = selectedIdx === qData.correct;
+
+            // Disable all buttons
+            allBtns.forEach(b => b.disabled = true);
+
+            if (isCorrect) {
+                playSound('correct');
+                btn.classList.add('border-green-500', 'bg-green-100', 'dark:bg-green-900/50', 'text-green-800', 'dark:text-green-300');
+                btn.classList.remove('border-gray-300', 'dark:border-gray-600');
+                score++;
+                explanationBox.innerHTML = `<b>✅ Benar!</b><br>${qData.explanation}`;
+                explanationBox.classList.remove('bg-blue-100', 'border-blue-500', 'dark:bg-blue-900/50');
+                explanationBox.classList.add('bg-green-100', 'border-green-500', 'dark:bg-green-900/50', 'text-green-900', 'dark:text-green-200');
+            } else {
+                playSound('wrong');
+                btn.classList.add('border-red-500', 'bg-red-100', 'dark:bg-red-900/50', 'text-red-800', 'dark:text-red-300');
+                btn.classList.remove('border-gray-300', 'dark:border-gray-600');
+                
+                // Highlight correct answer
+                allBtns[qData.correct].classList.add('border-green-500', 'bg-green-100', 'dark:bg-green-900/50');
+                allBtns[qData.correct].classList.remove('border-gray-300', 'dark:border-gray-600');
+
+                explanationBox.innerHTML = `<b>❌ Kurang Tepat.</b><br>${qData.explanation}`;
+                explanationBox.classList.remove('bg-blue-100', 'border-blue-500', 'dark:bg-blue-900/50');
+                explanationBox.classList.add('bg-red-100', 'border-red-500', 'dark:bg-red-900/50', 'text-red-900', 'dark:text-red-200');
+            }
+
+            explanationBox.classList.remove('hidden');
+            
+            // Enable Next Button
+            btnNext.disabled = false;
+        }
+
+        function updateUI() {
+            // Hide all slides
+            document.querySelectorAll('.slide-content').forEach(s => s.classList.remove('active'));
+
+            const totalSteps = totalSlides + totalQuiz + 1; // +1 for result
+            let currentStep = 0;
+
+            if (!isQuizMode && !quizCompleted) {
+                document.getElementById(`slide-${currentSlideIdx}`).classList.add('active');
+                currentStep = currentSlideIdx + 1;
+                slideCounter.textContent = `${currentStep}/${totalSteps}`;
+                btnPrev.disabled = currentSlideIdx === 0;
+                btnNext.disabled = false;
+                if(currentSlideIdx === totalSlides - 1) {
+                    btnNext.innerHTML = 'Mulai Kuis 🚀';
+                } else {
+                    btnNext.innerHTML = '<span class="hidden sm:inline">Selanjutnya</span> <span>▶</span>';
+                }
+            } else if (isQuizMode && !quizCompleted) {
+                document.getElementById(`quiz-${currentQuizIdx}`).classList.add('active');
+                currentStep = totalSlides + currentQuizIdx + 1;
+                slideCounter.textContent = `${currentStep}/${totalSteps}`;
+                
+                // Only allow previous if it's the first quiz question (to go back to lessons)
+                btnPrev.disabled = currentQuizIdx !== 0; 
+                
+                // Disable next until answered
+                const currentQuizContainer = document.getElementById(`quiz-${currentQuizIdx}`);
+                const isAnswered = currentQuizContainer.querySelector('.explanation-box').classList.contains('hidden') === false;
+                btnNext.disabled = !isAnswered;
+
+                // Update score display for next slides
+                const scoreDisplays = document.querySelectorAll(`[id^="score-display-"]`);
+                scoreDisplays.forEach(el => el.textContent = score * 20);
+
+                if (currentQuizIdx === totalQuiz - 1 && isAnswered) {
+                     btnNext.innerHTML = 'Lihat Hasil 🏆';
+                } else {
+                     btnNext.innerHTML = '<span class="hidden sm:inline">Selanjutnya</span> <span>▶</span>';
+                }
+
+            } else if (quizCompleted) {
+                document.getElementById(`quiz-result`).classList.add('active');
+                currentStep = totalSteps;
+                slideCounter.textContent = `Selesai`;
+                
+                const finalPercentage = (score / totalQuiz) * 100;
+                document.getElementById('final-score').textContent = `${finalPercentage}%`;
+                
+                let msg, icon;
+                if (finalPercentage === 100) {
+                    msg = "Sempurna! Kamu memiliki insting AI Infrastructure Engineer sejati.";
+                    icon = "👑";
+                } else if (finalPercentage >= 60) {
+                    msg = "Kerja bagus! Sedikit lagi kamu bisa menguasai arsitektur AI.";
+                    icon = "🔥";
+                } else {
+                    msg = "Jangan menyerah! Coba ulangi materi untuk memantapkan pondasi TJKT-mu.";
+                    icon = "💪";
+                }
+                document.getElementById('result-message').textContent = msg;
+                document.getElementById('result-icon').textContent = icon;
+                playSound('finish');
+
+                btnPrev.style.display = 'none';
+                btnNext.style.display = 'none';
+                document.getElementById('dot-indicators').style.display = 'none';
+            }
+
+            // Update Progress Bar
+            progressBar.style.width = `${(currentStep / totalSteps) * 100}%`;
+        }
+
+        btnNext.addEventListener('click', () => {
+            playSound('click');
+            if (!isQuizMode && !quizCompleted) {
+                if (currentSlideIdx < totalSlides - 1) {
+                    currentSlideIdx++;
+                } else {
+                    isQuizMode = true; // Enter quiz mode
+                }
+            } else if (isQuizMode && !quizCompleted) {
+                if (currentQuizIdx < totalQuiz - 1) {
+                    currentQuizIdx++;
+                } else {
+                    quizCompleted = true;
+                }
+            }
+            updateUI();
+        });
+
+        btnPrev.addEventListener('click', () => {
+            playSound('click');
+            if (isQuizMode) {
+                if (currentQuizIdx === 0) {
+                    isQuizMode = false;
+                    currentSlideIdx = totalSlides - 1;
+                }
+            } else {
+                if (currentSlideIdx > 0) {
+                    currentSlideIdx--;
+                }
+            }
+            updateUI();
+        });
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
